@@ -1,9 +1,6 @@
-# Install necessary libraries if not already installed
 !pip install transformers torch
 
 from transformers import pipeline
-
-# Initialize the Hugging Face sentiment-analysis pipeline with a pre-trained model
 sentiment_analyzer = pipeline('sentiment-analysis')
 
 def sentiment_analysis_with_prompts(text):
@@ -12,7 +9,7 @@ def sentiment_analysis_with_prompts(text):
     Structured prompt, and Contextual prompt.
     """
     
-    # Few-shot example (providing some labeled examples for context)
+    # Few-shot example
     few_shot_prompt = """
     Review: "I loved the service at this hotel, everyone was friendly!" -> Sentiment: Positive
     Review: "The room was dirty and I had to wait a long time for my check-in." -> Sentiment: Negative
@@ -22,16 +19,16 @@ def sentiment_analysis_with_prompts(text):
     Review: "{text}"
     """
     
-    # Zero-shot (no examples, just the task description)
+    # Zero-shot
     zero_shot_prompt = f"Classify the sentiment of the following review: {text}. The possible sentiments are Positive, Negative, or Neutral."
     
-    # Direct prompt (straightforward question)
+    # Direct prompt
     direct_prompt = f"Is the sentiment of this review positive or negative? {text}"
     
-    # Structured prompt (return result in structured format)
+    # Structured prompt 
     structured_prompt = f"Classify the sentiment of the following review. Output format: {{'Sentiment': 'Positive/Negative/Neutral'}}\nReview: {text}"
     
-    # Contextual prompt (providing context like a hotel review to improve understanding)
+    # Contextual prompt
     contextual_prompt = f"This is a review for a hotel. Please classify the sentiment as Positive, Negative, or Neutral.\nReview: {text}"
 
     # Analyze sentiment using Hugging Face's pre-trained sentiment analysis model for each prompt
@@ -41,7 +38,7 @@ def sentiment_analysis_with_prompts(text):
     result_structured_prompt = sentiment_analyzer(structured_prompt)
     result_contextual_prompt = sentiment_analyzer(contextual_prompt)
 
-    # Return all results for comparison
+    
     return {
         "Few-shot Example Prompt": result_few_shot[0]['label'],
         "Zero-shot Prompt": result_zero_shot[0]['label'],
@@ -50,7 +47,7 @@ def sentiment_analysis_with_prompts(text):
         "Contextual Prompt": result_contextual_prompt[0]['label']
     }
 
-# Example review text for testing the prompts
+
 review_text = "The hotel was amazing! The staff were friendly, and the room was clean. I had a great time during my stay."
 
 # Analyze sentiment with various prompt engineering techniques
