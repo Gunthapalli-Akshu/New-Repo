@@ -6,7 +6,6 @@ import json
 nltk.download('stopwords')
 nltk.download('punkt')
 
-# Function to analyze the hotel feedback
 def analyze_feedback(feedback):
     # Define keywords associated with each area
     areas_keywords = {
@@ -16,22 +15,21 @@ def analyze_feedback(feedback):
         'service': ['service', 'staff', 'help', 'assistance', 'staff member', 'housekeeping']
     }
     
-    # Analyze the sentiment of the feedback
+    
     sentiment_analysis = TextBlob(feedback)
     sentiment = 'Positive' if sentiment_analysis.sentiment.polarity > 0 else 'Negative'
 
     if sentiment == 'Negative':
-        # Convert feedback to lowercase for easier keyword matching
         feedback_lower = feedback.lower()
         
-        # Identify which area is responsible for the negative sentiment
+    
         responsible_area = None
         for area, keywords in areas_keywords.items():
             if any(keyword in feedback_lower for keyword in keywords):
                 responsible_area = area
                 break
 
-        # Return the result
+
         if responsible_area:
             return {
                 "review": feedback,
@@ -51,7 +49,6 @@ def analyze_feedback(feedback):
             "responsible_area": "None"  # No negative sentiment
         }
 
-# Test examples
 hotel_feedbacks = [
     "The reception staff was rude and unhelpful. When I arrived, they didn't seem interested in assisting me with my check-in.",
     "The room was very comfortable and clean. The staff was friendly, and the dining experience was great. I will definitely come back.",
@@ -61,7 +58,7 @@ hotel_feedbacks = [
     "The room was noisy, and the bed was uncomfortable. I expected better. The dining experience was disappointing as well, with poor food quality."
 ]
 
-# Analyze each feedback
+
 for feedback in hotel_feedbacks:
     result = analyze_feedback(feedback)
     print(json.dumps(result, indent=4))
