@@ -1,64 +1,73 @@
-import nltk
-from textblob import TextBlob
-import json
+import pandas as pd
+from transformers import pipeline
 
-# Download necessary NLTK data files
-nltk.download('stopwords')
-nltk.download('punkt')
+# Initialize sentiment analysis pipeline using Hugging Face's transformers
+sentiment_analyzer = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
 
-def analyze_feedback(feedback):
-    # Define keywords associated with each area
-    areas_keywords = {
-        'dining': ['food', 'dining', 'restaurant', 'meal', 'menu', 'breakfast', 'lunch', 'dinner'],
-        'reception': ['reception', 'check-in', 'staff', 'welcome', 'front desk'],
-        'room': ['room', 'bed', 'cleanliness', 'bathroom', 'shower', 'comfort', 'pillows'],
-        'service': ['service', 'staff', 'help', 'assistance', 'staff member', 'housekeeping']
-    }
+# Define key areas we want to detect
+areas_of_interest = ['dining', 'reception', 'restaurant', 'service', 'food', 'staff', 'ambiance']
+
+# Function to detect sentiment and responsible area
+def analyze_review(review_text):
+    # Step 1: Perform overall sentiment analysis for the entire review
+    sentiment_result = sentiment_analyzer(review_text)
+    sentiment_label = sentiment_result[0]['label']
     
+    # Initialize the result for responsible area
+    responsible_area = None
     
-    sentiment_analysis = TextBlob(feedback)
-    sentiment = 'Positive' if sentiment_analysis.sentiment.polarity > 0 else 'Negative'
-
-    if sentiment == 'Negative':
-        feedback_lower = feedback.lower()
+    # Step 2: If the sentiment is negative, analyze the areas mentioned in the review
+    if sentiment_label == 'NEGATIVE':
+        # Split review into sections based on area-specific keywords
+        sections = {}
+        for area in areas_of_interest:
+            # Search for the area in the review and isolate the sentence or phrase related to it
+            pattern = r"([^.]*\b" + re.escape(area) + r"\b[^.]*\.)"
+            matches = re.findall(pattern, review_text, re.IGNORECASE)
+            
+            # If an area is mentioned, store it and perform sentiment analysis
+            if matches:
+                sections[area] = " ".join(matches)
         
-    
-        responsible_area = None
-        for area, keywords in areas_keywords.items():
-            if any(keyword in feedback_lower for keyword in keywords):
-                responsible_area = area
-                break
-
-
-        if responsible_area:
-            return {
-                "review": feedback,
-                "sentiment": sentiment,
-                "responsible_area": responsible_area
-            }
+        # Step 3: Analyze sentiment for each section (area) mentioned
+        negative_areas = []
+        for area, section in sections.items():
+            sentiment_result = sentiment_analyzer(section)
+            sentiment_label = sentiment_result[0]['label']
+            
+            # If negative sentiment is detected in the section, add the area
+            if sentiment_label == 'NEGATIVE':
+                negative_areas.append(area)
+        
+        # Return the areas responsible for negative sentiment
+        if negative_areas:
+            responsible_area = ", ".join(negative_areas)
         else:
-            return {
-                "review": feedback,
-                "sentiment": sentiment,
-                "responsible_area": "None"  # No specific area found
-            }
+            responsible_area = "No specific area identified"
+    
     else:
-        return {
-            "review": feedback,
-            "sentiment": sentiment,
-            "responsible_area": "None"  # No negative sentiment
-        }
+        responsible_area = "No negative sentiment detected"
+    
+    # Return both the overall sentiment and the responsible area
+    return sentiment_label, responsible_area
 
-hotel_feedbacks = [
-    "The reception staff was rude and unhelpful. When I arrived, they didn't seem interested in assisting me with my check-in.",
-    "The room was very comfortable and clean. The staff was friendly, and the dining experience was great. I will definitely come back.",
-    "I had a terrible time at the hotel. The food was cold, and the service was really slow. The receptionist was unfriendly and unprofessional.",
-    "Overall, it was an okay stay. The room was average, but the staff at the reception were friendly. The dining area could be improved though.",
-    "I absolutely loved my stay here. The staff at the reception were welcoming, and the dining was a five-star experience. Very satisfied!",
-    "The room was noisy, and the bed was uncomfortable. I expected better. The dining experience was disappointing as well, with poor food quality."
+# Example negative feedback reviews for testing
+negative_reviews = [
+    
+    """The dining experience was horrible! The waiter was rude and didn't care about our concerns. The food took over an hour to arrive, and when it did, it was cold.""",
+    
+    """I regret choosing this place. Reception was chaotic, and the dining was worse. Our table was dirty, and the food was tasteless. I won't come back!""",
+    
+    """The reception area was poorly managed, with long wait times and no direction. Once we were finally seated, the dining area was noisy, and the food was underwhelming.""",
+    
+    """The reception was fine, but the dining experience ruined everything. The food was bland, and the service was incredibly slow. Definitely not coming again."""
 ]
 
+# Create a DataFrame to store the reviews
+df_reviews = pd.DataFrame(negative_reviews, columns=["Review"])
 
-for feedback in hotel_feedbacks:
-    result = analyze_feedback(feedback)
-    print(json.dumps(result, indent=4))
+# Apply the analysis function to each review and store the results in new columns
+df_reviews[['Sentiment', 'Responsible_Area']] = df_reviews['Review'].apply(lambda x: pd.Series(analyze_review(x)))
+
+# Show the DataFrame with results
+print(df_reviews)
