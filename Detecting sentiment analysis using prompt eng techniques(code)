@@ -1,59 +1,104 @@
-!pip install transformers torch
+import requests
+import time
 
-from transformers import pipeline
-sentiment_analyzer = pipeline('sentiment-analysis')
+# Define your Hugging Face API key
+api_key = "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"  # Replace with your actual Hugging Face API key
 
-def sentiment_analysis_with_prompts(text):
-    """
-    Analyze sentiment using various prompt engineering techniques: Few-shot, Zero-shot, Direct prompt,
-    Structured prompt, and Contextual prompt.
-    """
-    
-    # Few-shot example
-    few_shot_prompt = """
-    Review: "I loved the service at this hotel, everyone was friendly!" -> Sentiment: Positive
-    Review: "The room was dirty and I had to wait a long time for my check-in." -> Sentiment: Negative
-    Review: "The hotel was nice, but the food was expensive." -> Sentiment: Neutral
-    
-    Now, analyze the following review:
-    Review: "{text}"
-    """
-    
-    # Zero-shot
-    zero_shot_prompt = f"Classify the sentiment of the following review: {text}. The possible sentiments are Positive, Negative, or Neutral."
-    
-    # Direct prompt
-    direct_prompt = f"Is the sentiment of this review positive or negative? {text}"
-    
-    # Structured prompt 
-    structured_prompt = f"Classify the sentiment of the following review. Output format: {{'Sentiment': 'Positive/Negative/Neutral'}}\nReview: {text}"
-    
-    # Contextual prompt
-    contextual_prompt = f"This is a review for a hotel. Please classify the sentiment as Positive, Negative, or Neutral.\nReview: {text}"
+#Define the API endpoint and headers for BLOOM model
+api_url = "https://api-inference.huggingface.co/models/bigscience/bloom"  # BLOOM model URL
+headers = {
+    "Authorization": f"Bearer {api_key}",
+}
 
-    # Analyze sentiment using Hugging Face's pre-trained sentiment analysis model for each prompt
-    result_few_shot = sentiment_analyzer(few_shot_prompt.format(text=text))
-    result_zero_shot = sentiment_analyzer(zero_shot_prompt)
-    result_direct_prompt = sentiment_analyzer(direct_prompt)
-    result_structured_prompt = sentiment_analyzer(structured_prompt)
-    result_contextual_prompt = sentiment_analyzer(contextual_prompt)
-
-    
-    return {
-        "Few-shot Example Prompt": result_few_shot[0]['label'],
-        "Zero-shot Prompt": result_zero_shot[0]['label'],
-        "Direct Prompt": result_direct_prompt[0]['label'],
-        "Structured Prompt": result_structured_prompt[0]['label'],
-        "Contextual Prompt": result_contextual_prompt[0]['label']
+def classify_sentiment(feedback_text):
+    payload = {
+        "inputs": f"Classify the sentiment of the following review as Positive, Negative, or Neutral: {feedback_text}",
+        "parameters": {
+            "max_length": 50,  # Set a reasonable max length for the output
+            "temperature": 0.7,  # Control randomness (0 to 1)
+            "top_p": 0.9,  # Nucleus sampling
+            "top_k": 50  # Top K sampling
+        }
     }
 
+    retries = 5
+    for attempt in range(retries):
+        response = requests.post(api_url, headers=headers, json=payload)
 
-review_text = "The hotel was amazing! The staff were friendly, and the room was clean. I had a great time during my stay."
+        if response.status_code == 200:
+            result = response.json()
+            return result  # Return the response directly for debugging
+            
+        elif response.status_code == 503:
+            wait_time = 2 ** attempt  # Exponential backoff
+            print(f"Model is loading. Retrying in {wait_time} seconds...")
+            time.sleep(wait_time)
+        else:
+            return f"Error: {response.status_code}, {response.text}"
+    
+    return "Error: Model could not be loaded after multiple attempts."
 
-# Analyze sentiment with various prompt engineering techniques
-sentiment_results = sentiment_analysis_with_prompts(review_text)
+#Define one short hotel feedback
+guest_feedback = "The hotel was great, the staff was friendly, and the room was clean, but the breakfast could have been better."
 
-# Print the results
-print("Sentiment Analysis Results:")
-for prompt_type, sentiment in sentiment_results.items():
-    print(f"{prompt_type}: {sentiment}")
+#Create prompts for different techniques
+
+prompts = []
+
+# Zero-shot: No prior examples, just classify based on the text
+prompts.append(("Zero-shot", f"Classify the sentiment of the following review as Positive, Negative, or Neutral: {guest_feedback}"))
+
+# Few-shot: Provide a few examples to guide the model
+few_shot_prompt = """
+Classify the sentiment of the following reviews as Positive, Negative, or Neutral:
+Review: 'The room was clean, and the staff were very polite.'
+Sentiment: Positive
+
+Review: 'The room was dirty and uncomfortable. The bed was hard, and the sheets were not clean.'
+Sentiment: Negative
+"""
+
+prompts.append(("Few-shot", f"{few_shot_prompt} Review: '{guest_feedback}'"))
+
+# Direct: Directly asking the model for sentiment
+prompts.append(("Direct", f"Classify the sentiment of the following review as Positive, Negative, or Neutral: {guest_feedback}"))
+
+# Contextual: Making it more conversational
+prompts.append(("Contextual", f"Based on the review: '{guest_feedback}', how would you rate the sentiment as positive, negative, or neutral?"))
+
+# Structured: Requesting a structured response
+prompts.append(("Structured", f"""
+Please classify the sentiment of the following review:
+Review: '{guest_feedback}'
+Output format: Sentiment = [Positive, Negative, Neutral]
+"""))
+
+#Generate output using BLOOM for each technique
+for prompt_name, prompt in prompts:
+    print(f"Using {prompt_name} Prompt: \n{prompt}\n")
+    response = classify_sentiment(prompt)
+    
+    #Process the response and extract the sentiment
+    if isinstance(response, list) and len(response) > 0:
+        # Check the content of the response for sentiment classification
+        generated_text = response[0].get('generated_text', '').strip() if isinstance(response[0], dict) else None
+        
+        if generated_text:
+            # Simple logic to determine sentiment from the output
+            if "positive" in generated_text.lower():
+                sentiment = "POSITIVE"
+            elif "negative" in generated_text.lower():
+                sentiment = "NEGATIVE"
+            elif "neutral" in generated_text.lower():
+                sentiment = "NEUTRAL"
+            else:
+                sentiment = "NEUTRAL"
+            
+            print(f"Sentiment from {prompt_name} Feedback: {sentiment}")
+        else:
+            print(f"Error: No generated text found for {prompt_name} feedback")
+    else:
+        print(f"Unexpected response format for {prompt_name} feedback:")
+        print(response)
+    
+    print("\n" + "-" * 50 + "\n")
