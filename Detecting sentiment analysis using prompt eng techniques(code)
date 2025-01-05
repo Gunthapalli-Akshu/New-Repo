@@ -1,24 +1,24 @@
 import requests
 import time
 
-# Step 1: Define your Hugging Face API key (ensure this is kept private)
+#Define your Hugging Face API key
 api_key = "your_hugging_face_api_key"  # Replace with your actual Hugging Face API key
 
-# Step 2: Define the API endpoint and headers for BLOOM model
+#Define the API endpoint and headers for BLOOM model
 api_url = "https://api-inference.huggingface.co/models/bigscience/bloom"  # BLOOM model URL
 headers = {
     "Authorization": f"Bearer {api_key}",
 }
 
-# Step 3: Define a function to make the request to Hugging Face's API for text generation (using BLOOM)
+#Define a function to make the request to Hugging Face's API 
 def classify_sentiment(feedback_text):
     payload = {
         "inputs": f"Classify the sentiment of the following review as Positive, Negative, or Neutral: {feedback_text}",
         "parameters": {
-            "max_length": 50,  # Set a reasonable max length for the output
-            "temperature": 0.7,  # Control randomness (0 to 1)
-            "top_p": 0.9,  # Nucleus sampling
-            "top_k": 50  # Top K sampling
+            "max_length": 50,  
+            "temperature": 0.7,  
+            "top_p": 0.9,  
+            "top_k": 50  
         }
     }
 
@@ -39,10 +39,10 @@ def classify_sentiment(feedback_text):
     
     return "Error: Model could not be loaded after multiple attempts."
 
-# Step 4: Define one short hotel feedback
+#Define one short hotel feedback
 guest_feedback = "The hotel was great, the staff was friendly, and the room was clean, but the breakfast could have been better."
 
-# Step 5: Create prompts for different techniques
+#Create prompts for different techniques
 
 prompts = []
 
@@ -74,12 +74,12 @@ Review: '{guest_feedback}'
 Output format: Sentiment = [Positive, Negative, Neutral]
 """))
 
-# Step 6: Generate output using BLOOM for each technique
+#Generate output using BLOOM for each technique
 for prompt_name, prompt in prompts:
     print(f"Using {prompt_name} Prompt: \n{prompt}\n")
     response = classify_sentiment(prompt)
     
-    # Step 7: Process the response and extract the sentiment
+    #Process the response and extract the sentiment
     if isinstance(response, list) and len(response) > 0:
         # Check the content of the response for sentiment classification
         generated_text = response[0].get('generated_text', '').strip() if isinstance(response[0], dict) else None
