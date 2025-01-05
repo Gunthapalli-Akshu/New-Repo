@@ -2,7 +2,7 @@ import requests
 import time
 
 # Define your Hugging Face API key
-api_key = "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"  # Replace with your actual Hugging Face API key
+api_key = "your_hugging_face_api_key"  # Replace with your actual Hugging Face API key
 
 #Define the API endpoint and headers for BLOOM model
 api_url = "https://api-inference.huggingface.co/models/bigscience/bloom"  # BLOOM model URL
