@@ -1,73 +1,86 @@
-import pandas as pd
-from transformers import pipeline
+import requests
+import time
 
-# Initialize sentiment analysis pipeline using Hugging Face's transformers
-sentiment_analyzer = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+#Define your Hugging Face API key
+api_key = "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" 
 
-# Define key areas we want to detect
-areas_of_interest = ['dining', 'reception', 'restaurant', 'service', 'food', 'staff', 'ambiance']
+#Define the API endpoint and headers (for BLOOM model)
+api_url = "https://api-inference.huggingface.co/models/bigscience/bloom"  # BLOOM model endpoint
+headers = {
+    "Authorization": f"Bearer {api_key}",
+}
 
-# Function to detect sentiment and responsible area
-def analyze_review(review_text):
-    # Step 1: Perform overall sentiment analysis for the entire review
-    sentiment_result = sentiment_analyzer(review_text)
-    sentiment_label = sentiment_result[0]['label']
-    
-    # Initialize the result for responsible area
-    responsible_area = None
-    
-    # Step 2: If the sentiment is negative, analyze the areas mentioned in the review
-    if sentiment_label == 'NEGATIVE':
-        # Split review into sections based on area-specific keywords
-        sections = {}
-        for area in areas_of_interest:
-            # Search for the area in the review and isolate the sentence or phrase related to it
-            pattern = r"([^.]*\b" + re.escape(area) + r"\b[^.]*\.)"
-            matches = re.findall(pattern, review_text, re.IGNORECASE)
+def classify_sentiment(feedback_text):
+    # Create a prompt for BLOOM to classify the sentiment and responsible area
+    prompt = f"Classify the sentiment and responsible area for the following feedback: \n\n{feedback_text}\n\nResponse:"
+
+    payload = {
+        "inputs": prompt
+    }
+
+    retries = 5
+    for attempt in range(retries):
+        response = requests.post(api_url, headers=headers, json=payload)
+
+        if response.status_code == 200:
+            result = response.json()
+            return result  # Return the response directly for debugging
             
-            # If an area is mentioned, store it and perform sentiment analysis
-            if matches:
-                sections[area] = " ".join(matches)
-        
-        # Step 3: Analyze sentiment for each section (area) mentioned
-        negative_areas = []
-        for area, section in sections.items():
-            sentiment_result = sentiment_analyzer(section)
-            sentiment_label = sentiment_result[0]['label']
-            
-            # If negative sentiment is detected in the section, add the area
-            if sentiment_label == 'NEGATIVE':
-                negative_areas.append(area)
-        
-        # Return the areas responsible for negative sentiment
-        if negative_areas:
-            responsible_area = ", ".join(negative_areas)
+        elif response.status_code == 503:
+            wait_time = 2 ** attempt  # Exponential backoff
+            print(f"Model is loading. Retrying in {wait_time} seconds...")
+            time.sleep(wait_time)
         else:
-            responsible_area = "No specific area identified"
+            return f"Error: {response.status_code}, {response.text}"
     
-    else:
-        responsible_area = "No negative sentiment detected"
-    
-    # Return both the overall sentiment and the responsible area
-    return sentiment_label, responsible_area
+    return "Error: Model could not be loaded after multiple attempts."
 
-# Example negative feedback reviews for testing
-negative_reviews = [
-    
-    """The dining experience was horrible! The waiter was rude and didn't care about our concerns. The food took over an hour to arrive, and when it did, it was cold.""",
-    
-    """I regret choosing this place. Reception was chaotic, and the dining was worse. Our table was dirty, and the food was tasteless. I won't come back!""",
-    
-    """The reception area was poorly managed, with long wait times and no direction. Once we were finally seated, the dining area was noisy, and the food was underwhelming.""",
-    
-    """The reception was fine, but the dining experience ruined everything. The food was bland, and the service was incredibly slow. Definitely not coming again."""
+#Example guest feedbacks (short negative feedbacks)
+guest_feedbacks = [
+    "The room was fine, but the service at the reception was terrible. The staff was unhelpful, and it took forever to check in.",
+    "The breakfast was awful. The food was cold and tasteless. I would never come back for a meal here.",
+    "The air conditioning in my room was broken, and when I called reception, no one answered. Very frustrating experience."
 ]
 
-# Create a DataFrame to store the reviews
-df_reviews = pd.DataFrame(negative_reviews, columns=["Review"])
+#Analyze each feedback
+for guest_feedback in guest_feedbacks:
+    print(f"\nAnalyzing Feedback: {guest_feedback}")
+    
+    #Classify sentiment and responsible area using Hugging Face API (BLOOM model)
+    response = classify_sentiment(guest_feedback)
 
-# Apply the analysis function to each review and store the results in new columns
-df_reviews[['Sentiment', 'Responsible_Area']] = df_reviews['Review'].apply(lambda x: pd.Series(analyze_review(x)))
+    #Check if the response is structured as expected
+    if isinstance(response, list) and len(response) > 0:
+        generated_text = response[0].get('generated_text', '').strip()
+        print("Generated Text by BLOOM:", generated_text)
 
-# Show the DataFrame with results
-print(df_reviews)
+        #negative keywords
+        negative_keywords = ["terrible", "worst", "disappointing", "slow","broken", "unbearably hot", "cold", "tasteless", "bad", "uninterested"]
+        
+        feedback_lower = guest_feedback.lower()
+        
+        # Check if any negative sentiment keywords are found
+        if any(keyword in feedback_lower for keyword in negative_keywords):
+            sentiment = "NEGATIVE"
+        else:
+            sentiment = "POSITIVE"
+
+        # Check for responsible area based on keywords
+        dining_keywords = ["dining", "breakfast", "food", "meal", "restaurant", "cafe", "dinner"]
+        reception_keywords = ["reception", "check-in", "front desk", "staff", "service", "air conditioning"]
+
+        # Check for dining-related issues
+        if any(keyword in feedback_lower for keyword in dining_keywords):
+            area = "Dining"
+        # Check for reception-related issues
+        elif any(keyword in feedback_lower for keyword in reception_keywords):
+            area = "Reception"
+        else:
+            area = "General"  
+
+        print(f"Sentiment: {sentiment}")
+        print(f"Responsible Area: {area}")
+    else:
+        # If the response format is not as expected, print the raw response
+        print("Unexpected response format:")
+        print(response)
