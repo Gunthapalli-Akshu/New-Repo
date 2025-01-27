@@ -6,7 +6,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 user_item_data = {
     'user_id': [1, 1, 2, 2, 3, 3, 4, 4],
     'item_id': [1, 2, 1, 3, 2, 3, 1, 4],
-    'interaction_score': [5, 3, 4, 2, 5, 4, 3, 5]  # Rating or interaction frequency
+    'interaction_score': [5, 3, 4, 2, 5, 4, 3, 5]  
 }
 
 
